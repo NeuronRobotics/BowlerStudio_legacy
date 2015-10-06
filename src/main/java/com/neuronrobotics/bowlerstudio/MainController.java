@@ -9,25 +9,23 @@ import haar.HaarFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URL;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.ResourceBundle;
 
-import javax.script.ScriptEngine;
+import javax.swing.UIManager;
 
-
-
-
-
-//import org.bytedeco.javacpp.Loader;
-//import org.bytedeco.javacpp.opencv_objdetect;
+import org.apache.commons.io.IOUtils;
 import org.opencv.core.Core;
 import org.reactfx.util.FxTimer;
 
 import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -35,24 +33,42 @@ import javafx.scene.SubScene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.CheckMenuItem;
-import javafx.scene.control.Menu;
+import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import com.neuronrobotics.bowlerstudio.creature.CreatureLab;
+import com.neuronrobotics.bowlerstudio.scripting.IGithubLoginListener;
+import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngine;
 import com.neuronrobotics.bowlerstudio.scripting.ScriptingEngineWidget;
-import com.neuronrobotics.jniloader.CHDKImageProvider;
-import com.neuronrobotics.jniloader.NativeResource;
-import com.neuronrobotics.jniloader.OpenCVJNILoader;
+import com.neuronrobotics.bowlerstudio.scripting.ScriptingWidgetType;
+import com.neuronrobotics.bowlerstudio.tabs.DyIOResourceFactory;
+import com.neuronrobotics.imageprovider.CHDKImageProvider;
+import com.neuronrobotics.imageprovider.NativeResource;
+import com.neuronrobotics.imageprovider.OpenCVJNILoader;
 import com.neuronrobotics.nrconsole.util.FileSelectionFactory;
 import com.neuronrobotics.nrconsole.util.GroovyFilter;
+import com.neuronrobotics.nrconsole.util.XmlFilter;
+import com.neuronrobotics.pidsim.LinearPhysicsEngine;
+import com.neuronrobotics.replicator.driver.NRPrinter;
 import com.neuronrobotics.replicator.driver.Slic3r;
 import com.neuronrobotics.sdk.pid.VirtualGenericPIDDevice;
+import com.neuronrobotics.sdk.addons.kinematics.DHParameterKinematics;
+import com.neuronrobotics.sdk.addons.kinematics.MobileBase;
 import com.neuronrobotics.sdk.addons.kinematics.gui.*;
+import com.sun.crypto.provider.DHParameterGenerator;
+import com.sun.speech.freetts.VoiceManager;
+
+import javafx.scene.control.Menu;
 /**
  * FXML Controller class
  *
@@ -68,6 +84,7 @@ public class MainController implements Initializable {
     private MenuBar menuBar;
     @FXML
     private MenuItem logoutGithub;
+    
 	static{
         System.setOut(new PrintStream(out));
         updateLog();
@@ -84,17 +101,6 @@ public class MainController implements Initializable {
 			alert.show();
 			e.printStackTrace();
 		}
-//		try{
-//			// Preload the opencv_objdetect module to work around a known bug.
-//		    Loader.load(opencv_objdetect.class);
-//		}catch(Exception e){
-//			e.printStackTrace();
-//		}
-//		
-
-			
-		
-		
 		if(NativeResource.isLinux()){
 			String [] possibleLocals = new String[]{
 					"/usr/local/share/OpenCV/java/lib"+Core.NATIVE_LIBRARY_NAME+".so",
@@ -111,33 +117,45 @@ public class MainController implements Initializable {
 			Slic3r.setExecutableLocation(basedir);
 			
 		}
+		try {
+			UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+			// This is a workaround for #8 and is only relavent on osx
+			// it causes the SwingNodes not to load if not called way ahead of time
+			javafx.scene.text.Font.getFamilies();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		DyIOResourceFactory.load();
+
 	}
 	
 	private static void updateLog(){
+		if(logViewRef!=null){
+			String current;
+			String finalStr;
+			if(out.size()==0){
+				newString=null;
+			}else{
+				newString = out.toString();
+				out.reset();
+			}
+			if(newString!=null){
+				current = logViewRef.getText()+newString;
+				try{
+					finalStr =new String(current.substring(current.getBytes().length-sizeOfTextBuffer));
+				}catch (StringIndexOutOfBoundsException ex){
+					finalStr =current;
+				}
+
+				logViewRef.setText(finalStr);
+				logViewRef.setScrollTop(Double.MAX_VALUE);
+			}
+			
+		}	
 		FxTimer.runLater(
-				Duration.ofMillis(100) ,() -> {
-					if(logViewRef!=null){
-						if(out.size()==0){
-							newString=null;
-						}else{
-							newString = out.toString();
-							out.reset();
-						}
-						if(newString!=null){
-							Platform.runLater(() -> {	
-								String current = logViewRef.getText()+newString;
-								if(current.getBytes().length>sizeOfTextBuffer){
-									current=new String(current.substring(current.getBytes().length-sizeOfTextBuffer));
-									logViewRef.setText(current);
-								}else
-									logViewRef.appendText(newString);
-								FxTimer.runLater(
-										Duration.ofMillis(10) ,() -> {
-											logViewRef.setScrollTop(Double.MAX_VALUE);
-										});
-							});
-						}
-					}	
+				Duration.ofMillis(50) ,() -> {
+
 					updateLog();					
 		});
 	}
@@ -147,7 +165,7 @@ public class MainController implements Initializable {
 
 
     @FXML
-    private TextArea logView;
+    private Pane logView;
 
     @FXML
     private ScrollPane editorContainer;
@@ -167,6 +185,8 @@ public class MainController implements Initializable {
     private CheckMenuItem AddDefaultRightArm;
     @FXML
     private CheckMenuItem AddVRCamera;
+	private ScriptingEngineWidget cmdLine;
+	@FXML Menu CreatureLabMenue;
 	
     /**
      * Initializes the controller class.
@@ -176,11 +196,10 @@ public class MainController implements Initializable {
      */
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-    	logViewRef=logView;
 
     	jfx3dmanager = new Jfx3dManager();
-        application = new BowlerStudioController(jfx3dmanager, this);
-        editorContainer.setContent(application);
+        setApplication(new BowlerStudioController(jfx3dmanager, this));
+        editorContainer.setContent(getApplication());
         
         
         subScene = jfx3dmanager.getSubScene();
@@ -192,29 +211,78 @@ public class MainController implements Initializable {
         System.out.println("Welcome to BowlerStudio!");
 		new Thread(){
 			public void run(){
+				setName("Load Haar Thread");
 				try{
 					HaarFactory.getStream(null);
 				}catch (Exception ex){}
 			}
 		}.start();
 		
-		getAddDefaultRightArm().setOnAction(event -> {
-			
-			application.onAddDefaultRightArm(event);
-		});
-		getAddVRCamera().setOnAction(event -> {
-			if(AddVRCamera.isSelected())
-				application.onAddVRCamera(event);
-		});
+//		getAddDefaultRightArm().setOnAction(event -> {
+//			
+//			application.onAddDefaultRightArm(event);
+//		});
+//		getAddVRCamera().setOnAction(event -> {
+//			if(AddVRCamera.isSelected())
+//				application.onAddVRCamera(event);
+//		});
 		
 		FxTimer.runLater(
 				Duration.ofMillis(100) ,() -> {
-					
-					logoutGithub.setText("Log out "+ScriptingEngineWidget.getLoginID());
+					if(ScriptingEngineWidget.getLoginID()!=null){
+						setToLoggedIn(ScriptingEngineWidget.getLoginID());
+					}else{
+						setToLoggedOut();
+					}
 												
 		});
-		
+		ScriptingEngine.addIGithubLoginListener(new IGithubLoginListener() {
+			
+			@Override
+			public void onLogout(String oldUsername) {
+				setToLoggedOut();
+			}
+			
+			@Override
+			public void onLogin(String newUsername) {
+				setToLoggedIn(newUsername);
+			}
+		});
+		//logView.resize(250, 300);
+		// after connection manager set up, add scripting widget
+    	logViewRef=new TextArea();
+    	logViewRef.prefWidthProperty().bind( logView.widthProperty().divide(2));
+    	logViewRef.prefHeightProperty().bind( logView.heightProperty().subtract(40));
+    	
+    	
+    	cmdLine = new ScriptingEngineWidget(ScriptingWidgetType.CMDLINE);
+    	VBox box = new VBox();
+    	box.getChildren().add(logViewRef);
+    	box.getChildren().add(cmdLine);
+    	VBox.setVgrow(logViewRef, Priority.ALWAYS);
+    	box.prefWidthProperty().bind( logView.widthProperty().subtract(10));
+    	
+    	logView.getChildren().addAll(box);
+    	
 
+    	
+		
+        //BowlerStudio.speak("Welcome to Bowler Studio");
+    }
+    
+    private void setToLoggedIn(final String name){
+		FxTimer.runLater(
+				Duration.ofMillis(100) ,() -> {
+			logoutGithub.disableProperty().set(false);
+			logoutGithub.setText("Log out "+name);
+		});
+    }
+    
+    private void setToLoggedOut(){
+		Platform.runLater(() -> {
+			logoutGithub.disableProperty().set(true);
+			logoutGithub.setText("Anonymous");
+		});
     }
 
 
@@ -257,23 +325,34 @@ public class MainController implements Initializable {
     
     @FXML
     private void onLoadFile(ActionEvent e) {
-    	openFile = FileSelectionFactory.GetFile(ScriptingEngineWidget.getLastFile(),
-				new GroovyFilter());
+    	new Thread(){
+    		public void run(){
+    			setName("Load File Thread");
+    	    	openFile = FileSelectionFactory.GetFile(ScriptingEngineWidget.getLastFile(),
+    					new ExtensionFilter("Groovy Scripts","*.groovy","*.java","*.txt"));
 
-        if (openFile == null) {
-            return;
-        }
-        application.createFileTab(openFile);
+    	        if (openFile == null) {
+    	            return;
+    	        }
+    	        getApplication().createFileTab(openFile);
+    		}
+    	}.start();
     }
 
     @FXML
     private void onConnect(ActionEvent e) {
-    	application.getConnectionManager().addConnection();
+    	new Thread(){
+    		public void run(){
+    			setName("Load BowlerDevice Dialog Thread");
+    	    	ConnectionManager.addConnection();
+    		}
+    	}.start();
     }
     
     @FXML
     private void onConnectVirtual(ActionEvent e) {
-    	application.getConnectionManager().addConnection(new VirtualGenericPIDDevice(10000),"virtual");
+    	
+    	ConnectionManager.addConnection(new VirtualGenericPIDDevice(10000),"virtual");
     }
 
   
@@ -283,94 +362,257 @@ public class MainController implements Initializable {
     }
 
     public TextArea getLogView() {
-        return logView;
+        return logViewRef;
     }
 
 	public void disconnect() {
 		jfx3dmanager.disconnect();
-		application.disconnect();
+		getApplication().disconnect();
 	}
+	
+	public void openUrlInNewTab(URL url){
+		getApplication().openUrlInNewTab(url);
+	}
+	
 
 
 	@FXML public void onConnectCHDKCamera(ActionEvent event) {
-		try{
-			application.getConnectionManager().addConnection(new CHDKImageProvider(),"cameraCHDK");
-		}catch (Exception e)
-		{
-			e.printStackTrace();
-		}
+		Platform.runLater(()->{
+			try {
+				ConnectionManager.addConnection(new CHDKImageProvider(),"cameraCHDK");
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		});
 	}
 
 
 
 	@FXML public void onConnectCVCamera(ActionEvent event) {
-		application.getConnectionManager().onConnectCVCamera();
+   
+		Platform.runLater(()->ConnectionManager.onConnectCVCamera());
+  
 		
 	}
 
 
 	@FXML public void onConnectJavaCVCamera() {
-		application.getConnectionManager().onConnectJavaCVCamera();
 
+		Platform.runLater(()->ConnectionManager.onConnectJavaCVCamera());
+    
 	}
 
 
 	@FXML public void onConnectFileSourceCamera() {
-		application.getConnectionManager().onConnectFileSourceCamera();
+    	Platform.runLater(()->ConnectionManager.onConnectFileSourceCamera());
+
 	}
 
 
 	@FXML public void onConnectURLSourceCamera() {
-		application.getConnectionManager().onConnectURLSourceCamera();
+
+    	Platform.runLater(()->ConnectionManager.onConnectURLSourceCamera());
+
 	}
 
 
 	@FXML public void onConnectHokuyoURG(ActionEvent event) {
-		application.getConnectionManager().onConnectHokuyoURG();
+		Platform.runLater(()->ConnectionManager.onConnectHokuyoURG());
 		
 	}
 
 
 	@FXML public void onConnectGamePad(ActionEvent event) {
-		application.getConnectionManager().onConnectGamePad();
+		Platform.runLater(()->ConnectionManager.onConnectGamePad("gamepad"));
 		
 	}
 
 
-	public CheckMenuItem getAddVRCamera() {
-		return AddVRCamera;
-	}
-
-
-	public void setAddVRCamera(CheckMenuItem addVRCamera) {
-		AddVRCamera = addVRCamera;
-	}
-
-
-	public CheckMenuItem getAddDefaultRightArm() {
-		return AddDefaultRightArm;
-	}
-
-
-	public void setAddDefaultRightArm(CheckMenuItem addDefaultRightArm) {
-		AddDefaultRightArm = addDefaultRightArm;
-	}
+//	public CheckMenuItem getAddVRCamera() {
+//		return AddVRCamera;
+//	}
+//
+//
+//	public void setAddVRCamera(CheckMenuItem addVRCamera) {
+//		AddVRCamera = addVRCamera;
+//	}
+//
+//
+//	public CheckMenuItem getAddDefaultRightArm() {
+//		return AddDefaultRightArm;
+//	}
+//
+//
+//	public void setAddDefaultRightArm(CheckMenuItem addDefaultRightArm) {
+//		AddDefaultRightArm = addDefaultRightArm;
+//	}
 
 
 	@FXML public void onLogin() {
-		try {
-			ScriptingEngineWidget.login();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+    	new Thread(){
+    		public void run(){
+    			setName("Login Gist Thread");
+    			try {
+    				ScriptingEngineWidget.login();
+    			} catch (IOException e) {
+    				// TODO Auto-generated catch block
+    				e.printStackTrace();
+    			}
+    		}
+    	}.start();
+	
 	}
 
 
 	@FXML public void onLogout() {
 		ScriptingEngineWidget.logout();
 	}
+
+
+	@FXML public void onConnectPidSim() {
+		LinearPhysicsEngine eng =new LinearPhysicsEngine();
+		eng.connect();
+		ConnectionManager.addConnection(eng,"engine");
+	}
+
+
+
+	@FXML public void onPrint(ActionEvent event) {
+		NRPrinter printer =(NRPrinter) ConnectionManager.pickConnectedDevice(NRPrinter.class);
+		if(printer!=null){
+			// run a print here
+		}
+		
+	}
+
+
+
+	@FXML public void onMobileBaseFromFile() {
+    	new Thread(){
+    		public void run(){
+    			setName("Load Mobile Base Thread");
+    	    	openFile = FileSelectionFactory.GetFile(ScriptingEngineWidget.getLastFile(),
+    	    			new ExtensionFilter("MobileBase XML","*.xml","*.XML"));
+
+    	        if (openFile == null) {
+    	            return;
+    	        }
+    	        Platform.runLater(()->{
+    				try {
+    					MobileBase mb = new MobileBase(new FileInputStream(openFile));
+    					ConnectionManager.addConnection(mb,mb.getScriptingName());
+    				} catch (Exception e) {
+    					// TODO Auto-generated catch block
+    					e.printStackTrace();
+    				}
+    			});
+    		}
+    	}.start();
+		
+	}
 	
+	@FXML public void onRobotArm(ActionEvent event) {
+		loadMobilebaseFromGist("2b0cff20ccee085c9c36","TrobotLinks.xml");
+	}
+	@FXML public void onHexapod() {
+		loadMobilebaseFromGist("bcb4760a449190206170","CarlTheRobot.xml");
+	}
+	@FXML public void onGrasshopper() {
+		loadMobilebaseFromGist("a6cbefc11693162cf9d4","GrassHopper.xml");
+	}
+
+	@FXML public void onInputArm() {
+		loadMobilebaseFromGist("98892e87253005adbe4a","TrobotMaster.xml");
+	}
+
+	@FXML public void onAddElephant() {
+		loadMobilebaseFromGist("aef13d65093951d13235","Elephant.xml");
+	}
+
+	public Menu getCreatureLabMenue() {
+		return CreatureLabMenue;
+	}
+
+	public void setCreatureLabMenue(Menu creatureLabMenue) {
+		CreatureLabMenue = creatureLabMenue;
+	}
+	
+	public void loadMobilebaseFromGist(String id,String file){
+		new Thread(){
+    		public void run(){
+				try {
+					BowlerStudio.openUrlInNewTab(new URL("https://gist.github.com/"+id));
+					String xmlContent = ScriptingEngineWidget.codeFromGistID(id,file)[0];
+					MobileBase mb = new MobileBase(IOUtils.toInputStream(xmlContent, "UTF-8"));
+					
+					mb.setSelfSource(new String[]{id,file});
+					ConnectionManager.addConnection(mb,mb.getScriptingName());
+					
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+    		}
+    	}.start();
+	}
+
+	@FXML public void onMobileBaseFromGist() {
+		TextInputDialog dialog = new TextInputDialog("https://gist.github.com/madhephaestus/bcb4760a449190206170");
+		dialog.setTitle("Select a Creature From a Gist");
+		dialog.setHeaderText("Enter the URL (Link from the browser)");
+		dialog.setContentText("Link to Gist: ");
+
+		// Traditional way to get the response value.
+		Optional<String> result = dialog.showAndWait();
+		if (result.isPresent()){
+		   
+		    String gistcode = ScriptingEngineWidget.urlToGist(result.get());
+		    System.out.println("Creature Gist " + gistcode);
+		    ArrayList<String> choices =ScriptingEngineWidget.filesInGist(gistcode,".xml");
+		    String suggestedChoice="";
+		    int numXml=0;
+		    for(int i=0;i<choices.size();i++){
+		    	String s = choices.get(i);
+		    	if(s.toLowerCase().endsWith(".xml")){
+		    		suggestedChoice=s;
+		    		numXml++;
+		    	}
+		    }
+		    
+		    if(numXml ==1){
+		    	System.out.println("Found just one file at  " + suggestedChoice);
+		    	//loadMobilebaseFromGist(gistcode,suggestedChoice);
+		    	//return;
+		    	
+		    }
+
+		    ChoiceDialog<String> d = new ChoiceDialog<>(suggestedChoice, choices);
+		    d.setTitle("Choose a file in the gist");
+		    d.setHeaderText("Select from the files in the gist to pick the Creature File");
+		    d.setContentText("Choose A Creature:");
+
+		    // Traditional way to get the response value.
+		    Optional<String> r = d.showAndWait();
+		    if (r.isPresent()){
+		        System.out.println("Your choice: " + r.get());
+		        loadMobilebaseFromGist(gistcode,r.get());
+		    }
+		}
+	
+	}
+	
+	public ScriptingEngineWidget createFileTab(File file){
+		return getApplication().createFileTab(file);
+	}
+
+	public BowlerStudioController getApplication() {
+		return application;
+	}
+
+	public void setApplication(BowlerStudioController application) {
+		this.application = application;
+	}
 
 
 }

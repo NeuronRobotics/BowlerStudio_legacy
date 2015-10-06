@@ -5,12 +5,15 @@ import java.util.ArrayList;
 import com.neuronrobotics.addons.driving.AbstractRobotDrive;
 import com.neuronrobotics.addons.driving.AckermanBotDriveData;
 import com.neuronrobotics.addons.driving.AckermanBotVelocityData;
+import com.neuronrobotics.addons.driving.AckermanConfiguration;
 import com.neuronrobotics.addons.driving.AckermanDefaultKinematics;
+import com.neuronrobotics.addons.driving.HokuyoURGDevice;
 import com.neuronrobotics.addons.driving.IAckermanBotKinematics;
 import com.neuronrobotics.sdk.addons.kinematics.ServoRotoryLink;
 import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.dyio.peripherals.DigitalOutputChannel;
 import com.neuronrobotics.sdk.pid.PIDChannel;
+import com.neuronrobotics.sdk.pid.PIDCommandException;
 import com.neuronrobotics.sdk.pid.PIDEvent;
 import com.neuronrobotics.sdk.util.ThreadUtil;
 
@@ -32,8 +35,11 @@ public class FormacarumRover extends AbstractRobotDrive {
 	private IAckermanBotKinematics ak = new AckermanDefaultKinematics();
 	private DigitalOutputChannel driveEnable;
 	private DigitalOutputChannel driveDirection;
-	private double scale = 360.0/4096.0;
 	private int currentEncoderReading;
+	private DigitalOutputChannel driveThree;
+	private HokuyoURGDevice laser;
+	private ServoRotoryLink noding;
+	private AckermanConfiguration akermanConfigs;
 	
 	public FormacarumRover(	PIDChannel drive,
 						PIDChannel lSteer,
@@ -41,8 +47,15 @@ public class FormacarumRover extends AbstractRobotDrive {
 						PIDChannel bSteer, 
 						DigitalOutputChannel driveEnable, 
 						DigitalOutputChannel driveDirection,
-						IAckermanBotKinematics akermanConfigs) {
-		ak=akermanConfigs;
+						DigitalOutputChannel driveThree,
+						HokuyoURGDevice laser,
+						ServoRotoryLink noding,
+						AckermanConfiguration akermanConfigs) {
+		this.driveThree = driveThree;
+		this.laser = laser;
+		this.noding = noding;
+		this.akermanConfigs = akermanConfigs;
+		ak=new AckermanDefaultKinematics(akermanConfigs);
 		this.driveEnable = driveEnable;
 		this.driveDirection = driveDirection;
 		setPIDChanel(drive);
@@ -53,6 +66,15 @@ public class FormacarumRover extends AbstractRobotDrive {
 		complexSteering=true;
 		SetDriveVelocity(0);
 	}
+	
+	public void setNodAngle(double  angle){
+		noding.setTargetAngle(angle);
+	}
+	
+	public double getNodAngle(){
+		return noding.getTargetAngle();
+	}
+	
 	
 	protected void setPIDChanel(PIDChannel d){
 		drive=d;
@@ -65,9 +87,9 @@ public class FormacarumRover extends AbstractRobotDrive {
 			steering.flush(0);
 			
 		}else{
-			this.lSteer.SetPIDSetPoint((int) (s/scale), 0);
-			this.rSteer.SetPIDSetPoint((int) (s/scale), 0);
-			this.bSteer.SetPIDSetPoint(0, 0);
+			this.lSteer.SetPIDSetPoint(0, 0);
+			this.rSteer.SetPIDSetPoint(0, 0);
+			this.bSteer.SetPIDSetPoint((int)(s* akermanConfigs.getSteerAngleToServo()), 0);
 		}
 	}
 	
@@ -94,20 +116,30 @@ public class FormacarumRover extends AbstractRobotDrive {
 	}
 	protected void SetDriveDistance(int ticks, double seconds){
 		Log.debug("Seting PID set point of= "+ticks+" currently at "+currentEncoderReading);
-		//drive.SetPIDSetPoint(ticks, seconds);
-		driveDirection.setHigh(ticks< currentEncoderReading);
-		driveEnable.setHigh(false);
-		ThreadUtil.wait((int) (seconds*1000));
-		driveEnable.setHigh(true);
-		Log.debug("Arrived at= "+currentEncoderReading);
+		drive.SetPIDSetPoint(ticks, seconds);
+//		SetDriveVelocity((int) (ticks/seconds));
+//		ThreadUtil.wait((int) (seconds*1000));
+//		SetDriveVelocity(0);
+//		Log.debug("Arrived at= "+currentEncoderReading);
 	}
-	protected void SetDriveVelocity(int ticksPerSecond){
+	
+	public void SetDriveVelocity(int ticksPerSecond){
 		Log.debug("Seting PID Velocity set point of="+ticksPerSecond);
 		if(ticksPerSecond>0){
-			driveDirection.setHigh(ticksPerSecond> 0);
+			driveDirection.setHigh(false);
 			driveEnable.setHigh(false);
-		}else{
+		}if(ticksPerSecond==0){
+			driveDirection.setHigh(false);//doesnt matter, stopped
 			driveEnable.setHigh(true);
+		}else{
+			driveDirection.setHigh(true);
+			driveEnable.setHigh(false);
+		}
+		try {
+			drive.SetPDVelocity(ticksPerSecond, 0);
+		} catch (PIDCommandException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 
 	}

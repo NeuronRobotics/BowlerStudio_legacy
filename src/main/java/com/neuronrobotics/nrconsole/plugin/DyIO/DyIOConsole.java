@@ -2,6 +2,7 @@ package com.neuronrobotics.nrconsole.plugin.DyIO;
 
 import java.util.ArrayList;
 
+import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
 import javafx.event.Event;
 import javafx.event.EventHandler;
@@ -16,6 +17,7 @@ import com.neuronrobotics.bowlerstudio.tabs.AbstractBowlerStudioTab;
 import com.neuronrobotics.sdk.common.BowlerAbstractConnection;
 import com.neuronrobotics.sdk.common.BowlerAbstractDevice;
 import com.neuronrobotics.sdk.common.IConnectionEventListener;
+import com.neuronrobotics.sdk.common.IDeviceConnectionEventListener;
 import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.dyio.DyIO;
 import com.neuronrobotics.sdk.dyio.DyIOChannel;
@@ -24,7 +26,7 @@ import com.neuronrobotics.sdk.dyio.DyIOPowerEvent;
 import com.neuronrobotics.sdk.dyio.IDyIOEvent;
 import com.neuronrobotics.sdk.dyio.IDyIOEventListener;
 
-public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPanelListener,IDyIOEventListener , IConnectionEventListener  {
+public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPanelListener,IDyIOEventListener , IConnectionEventListener, IDeviceConnectionEventListener  {
 	private DyIOPanel devicePanel =null;
 	private DyIOControlsPanel deviceControls=null;
 	private ArrayList<ChannelManager> channels =null;
@@ -68,10 +70,12 @@ public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPane
 	public DyIOPanel getDeviceDisplay() {
 		if(devicePanel == null)
 			devicePanel  = new DyIOPanel(dyio);
+		devicePanel.invalidate();
 		return devicePanel;
 	}
 	
 	public DyIOControlsPanel getDeviceControls() {
+		deviceControls.invalidate();
 		return deviceControls;
 	}
 	
@@ -102,7 +106,7 @@ public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPane
 	
 	public void onDyIOEvent(IDyIOEvent e) {
 		if(e.getClass() == DyIOPowerEvent.class){
-			System.out.println("Got power event: "+e);
+			//System.out.println("Got power event: "+e);
 			getDeviceDisplay().setPowerEvent(((DyIOPowerEvent)e));
 			try{
 				for(ChannelManager cm : channels) {
@@ -153,7 +157,6 @@ public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPane
 		this.dyio = (DyIO)pm;
 		deviceControls = new DyIOControlsPanel();
 		channels = new ArrayList<ChannelManager>();
-		dyio.addConnectionEventListener(this);
 
 		DyIO.disableFWCheck();
 		try {
@@ -166,38 +169,49 @@ public class DyIOConsole extends AbstractBowlerStudioTab implements IChannelPane
 //			}
 //			JOptionPane.showMessageDialog(null, "DyIO Firmware mis-match Warning\n"+ex.getMessage(), "DyIO Warning", JOptionPane.WARNING_MESSAGE);
 		}
-		DyIO.disableFWCheck();
 		
-		dyio.addDyIOEventListener(this);
-		dyio.setMuteResyncOnModeChange(true);
 		setupDyIO();
 		dyio.setMuteResyncOnModeChange(false);
-		dyio.getBatteryVoltage(true);
-
-		wrapper = new SwingNode();
 		JPanel jp = new JPanel(new MigLayout());
-
 		jp.add(getDeviceDisplay(), "pos 5 5");
 		jp.add(getDeviceControls(), "pos 560 5");
 		jp.setBorder(BorderFactory.createLoweredBevelBorder());
-		wrapper.setContent(jp);
-        ScrollPane s1 = new ScrollPane();
-	       
-        s1.setContent(wrapper);
-        setContent(s1);
-		setText(pm.getScriptingName()+" Console");
-		
 		onTabReOpening();
+		Platform.runLater(() -> {
+			wrapper = new SwingNode();
+			wrapper.setContent(jp);
+		    ScrollPane s1 = new ScrollPane();
+		    s1.setContent(wrapper);
+		    setContent(s1);
+			setText(pm.getScriptingName()+" Console");
+		});
+
 	}
+	
+	
 
 
 	@Override
 	public void onTabReOpening() {
-		// TODO Auto-generated method stub
+		dyio.addDyIOEventListener(this);
 		dyio.addConnectionEventListener(this);
 		for(ChannelManager c : channels) {
 			c.addListener(this);
 		}
+		dyio.getBatteryVoltage(true);
+	}
+
+
+	@Override
+	public void onDisconnect(BowlerAbstractDevice source) {
+		onDisconnect(source.getConnection());
+	}
+
+
+	@Override
+	public void onConnect(BowlerAbstractDevice source) {
+		// TODO Auto-generated method stub
+		onConnect(source.getConnection());
 	}
 
 

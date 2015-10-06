@@ -91,6 +91,22 @@ Let's go through the main features:
 ### Virtual Sensors
    Coming soon! Soon we will be able to provide virtual sensor devices, simulating real world sensors within the 3d environment. 
 
+# Make A Contribution
+BowlerStudio is an open source project and is always looking for help with both the application code and the tutorials content. 
+
+### Java Contributions
+
+If you are a Java developmer, skip ahead to [The Build Instructions](#command-line). The application is a light plugin framework for UI, 3D and Device interaction. You can look at this repository for issues. 
+
+### Adding Tutorials
+
+All of the content for BowlerStudio Tutorials is housed on our [Neuronrobotics.github.io](https://github.com/NeuronRobotics/NeuronRobotics.github.io) web page. Fork that repository and make contributions based on the README.md file in the root of the repository. To merge the changes into the main website, send a pull request with your changes to official repository. 
+
+Examples of tutorials that need to be added are [A simple Java Programming Introduction](https://github.com/NeuronRobotics/NeuronRobotics.github.io/issues/59). This tutorial set would go through the basic syntax of java and what all of the symbols mean and how to use them. 
+
+Another example of a tutorial that could be added is one for [JavaCad Cheatsheet](https://github.com/NeuronRobotics/NeuronRobotics.github.io/issues/58) where you would add a 'cheat sheet' of commands to use in the JavaCad system. 
+
+If a tutorial is missing and not described as needed by an issue, feel free to add additional issues. 
 
 ## How to Build BowlerStudio
 
@@ -110,25 +126,30 @@ by calling the `assemble` task.
 Navigate to the [Gradle](http://www.gradle.org/) project (e.g., `path/to/BowlerStudio`) and enter the following command:
 
 #### Bash (Linux/OS X/Cygwin/other Unix-like shell)
+
+#####Ubuntu Dependancies
+
+    sudo add-apt-repository ppa:webupd8team/java
+   
+    sudo apt-get update
+   
+    sudo apt-get install git gradle oracle-java8-installer oracle-java8-set-default libopencv2.4-java libopencv2.4-jni
+   
+#####All Unix  
+   
+    git clone https://github.com/NeuronRobotics/BowlerStudio.git
+   
+    cd BowlerStudio
     
     git submodule init
     
     git submodule update
     
-    cd java-bowler/
+    gradle assemble
     
-    git pull origin development
-    
-    cd ..
-    
-    bash gradlew assemble
-        
     java -jar build/libs/BowlerStudio.jar
     
-Now you can use the Eclipse Gradle plugin to import the project.
-
-http://marketplace.eclipse.org/content/gradle-integration-eclipse-44
-
+Now you can use the Eclipse Marketplace to install the Gradle Plugin
     
 #### Windows (CMD)
 

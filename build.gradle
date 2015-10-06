@@ -73,6 +73,8 @@ repositories {
 	mavenCentral()
 	maven { url 'https://oss.sonatype.org/content/repositories/snapshots/'  }
 	maven { url 'http://repo.jenkins-ci.org/public/' }
+	maven { url 'http://clojars.org/repo' }
+	
 }
 
 task wrapper(type: Wrapper) { gradleVersion = '2.1' }
@@ -96,7 +98,9 @@ dependencies {
 	compile group: 'commons-codec', name: 'commons-codec', version: '1.7'
 	compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.2.3'
 	compile group: 'org.kohsuke.stapler', name: 'stapler-jetty', version: '1.1'
-	compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '3.1.0.201310021548-r'
+	
+	compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '4.0.1.201506240215-r'
+	
 	compile group: 'com.squareup.okhttp', name: 'okhttp-urlconnection', version: '2.0.0'
 	compile group: 'org.kohsuke', name: 'wordnet-random-name', version: '1.2'
 	compile group: 'org.mockito', name: 'mockito-all', version: '1.9.5'
@@ -106,6 +110,11 @@ dependencies {
 	compile 'commons-io:commons-io:2.4'
 	compile group:'org.python',name:'jython',version:'2.5.3'
 	compile group:'org.python',name:'jython-standalone',version:'2.5.2'
+	compile 'org.clojure:clojure:1.7.0'
+	compile 'org.clojure:tools.nrepl:0.2.10'
+	compile "overtone:overtone:0.9.1"
+	compile "edu.cmu.sphinx:sphinx4-core:1.0-SNAPSHOT"
+	compile "edu.cmu.sphinx:sphinx4-data:1.0-SNAPSHOT"
 			
 	compile project(':JCSG')
 	compile project(':CHDK-PTP-Java')
@@ -123,7 +132,7 @@ dependencies {
 			compile files(basedir)
 		else
 			//If you set your OPENCV_DIR environment variable, then we wouldnt have to do hacky things
-			compile files('/Users/hephaestus/Desktop/opencv249build/bin/opencv-249.jar')
+			compile files('/Volumes/Snow Leopard/Applications/BowlerStudio.app/Contents/MacOS/opencv249build/bin/opencv-249.jar')
 	}
 	if(isLinux()){
 		//compile files('/usr/share/java/opencv-249.jar')
@@ -143,6 +152,12 @@ dependencies {
 	compile group: 'jexcelapi', name: 'jxl', version: '2.4.2'
 	compile group: 'com.google.zxing', name: 'zxing-parent', version: '3.2.0'
 	compile group:'com.github.ellzord', name:'JALSE', version:'1.0.9'
+	
+	compile group:'de.huxhorn.sulky', name:'de.huxhorn.sulky.3rdparty.jlayer', version:'1.0'
+	compile group:'com.googlecode.json-simple', name:'json-simple', version:'1.1'
+	compile 'com.fifesoft:rsyntaxtextarea:2.5.6'
+	
+	compile fileTree (dir: 'libs', includes: ['*.jar'])
 }
 
 // create a fat-jar (class files plus dependencies

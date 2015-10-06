@@ -4,99 +4,105 @@ package com.neuronrobotics.bowlerstudio;
 import java.util.ArrayList;
 
 import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import javafx.embed.swing.SwingNode;
 import javafx.scene.Group;
-import javafx.scene.Parent;
+import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBoxTreeItem;
-import javafx.scene.control.Tab;
+import javafx.scene.control.TitledPane;
 import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.CheckBoxTreeCell;
-import javafx.scene.input.MouseEvent;
-import javafx.stage.Popup;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import com.neuronrobotics.bowlerstudio.creature.CreatureLab;
+import com.neuronrobotics.bowlerstudio.creature.DhLab;
 import com.neuronrobotics.bowlerstudio.tabs.AbstractBowlerStudioTab;
 import com.neuronrobotics.bowlerstudio.tabs.CameraTab;
+import com.neuronrobotics.bowlerstudio.tabs.DyIOControl;
 import com.neuronrobotics.bowlerstudio.tabs.SalientTab;
-import com.neuronrobotics.jniloader.AbstractImageProvider;
-import com.neuronrobotics.jniloader.SalientDetector;
+import com.neuronrobotics.imageprovider.AbstractImageProvider;
 import com.neuronrobotics.nrconsole.plugin.BowlerCam.BowlerCamController;
 import com.neuronrobotics.nrconsole.plugin.DeviceConfig.PrinterConiguration;
 import com.neuronrobotics.nrconsole.plugin.DyIO.DyIOConsole;
 import com.neuronrobotics.nrconsole.plugin.DyIO.Secheduler.AnamationSequencer;
-import com.neuronrobotics.nrconsole.plugin.DyIO.Secheduler.SchedulerGui;
-import com.neuronrobotics.nrconsole.plugin.DyIO.hexapod.HexapodController;
 import com.neuronrobotics.nrconsole.plugin.PID.PIDControl;
 import com.neuronrobotics.nrconsole.plugin.bootloader.BootloaderPanel;
-import com.neuronrobotics.nrconsole.plugin.cartesian.KinematicsController;
-import com.neuronrobotics.replicator.driver.BowlerBoardDevice;
+import com.neuronrobotics.pidsim.LinearPhysicsEngine;
+import com.neuronrobotics.pidsim.PidLab;
 import com.neuronrobotics.replicator.driver.NRPrinter;
 import com.neuronrobotics.sdk.addons.kinematics.AbstractKinematicsNR;
+import com.neuronrobotics.sdk.addons.kinematics.MobileBase;
 import com.neuronrobotics.sdk.bootloader.NRBootLoader;
 import com.neuronrobotics.sdk.bowlercam.device.BowlerCamDevice;
-import com.neuronrobotics.sdk.common.BowlerAbstractConnection;
 import com.neuronrobotics.sdk.common.BowlerAbstractDevice;
-import com.neuronrobotics.sdk.common.IConnectionEventListener;
 import com.neuronrobotics.sdk.common.Log;
 import com.neuronrobotics.sdk.common.RpcEncapsulation;
 import com.neuronrobotics.sdk.dyio.DyIO;
-import com.neuronrobotics.sdk.namespace.bcs.pid.IExtendedPIDControl;
 import com.neuronrobotics.sdk.namespace.bcs.pid.IPidControlNamespace;
-import com.neuronrobotics.sdk.util.ThreadUtil;
 
 public class PluginManager {
 	
-	private String name;
 	private BowlerAbstractDevice dev;
-	private BowlerStudioController bowlerStudioController;
-	private TreeItem<String> item;
 	
-	private ArrayList<Class> deviceSupport = new ArrayList<Class>();
-	ArrayList<AbstractBowlerStudioTab> liveTabs = new ArrayList<>();
-	public PluginManager(BowlerAbstractDevice dev, BowlerStudioController bowlerStudioController){
+	private static ArrayList<DeviceSupportPluginMap> deviceSupport = new ArrayList<DeviceSupportPluginMap>();
+	private ArrayList<AbstractBowlerStudioTab> liveTabs = new ArrayList<>();
+	
+	// add tabs to the support list based on thier class
+	// adding additional classes here will show up in the default 
+	// tabs list for objects of that type
+	static{
+		//DyIO
+		addPlugin(new DeviceSupportPluginMap(DyIO.class, DyIOControl.class));
+		addPlugin(new DeviceSupportPluginMap(DyIO.class, AnamationSequencer.class));
+		
+		//Ipid
+		addPlugin(new DeviceSupportPluginMap(IPidControlNamespace.class, PIDControl.class));
+		// Image s
+		addPlugin(new DeviceSupportPluginMap(AbstractImageProvider.class, CameraTab.class));
+		addPlugin(new DeviceSupportPluginMap(AbstractImageProvider.class, SalientTab.class));
+		// Bootloader
+		addPlugin(new DeviceSupportPluginMap(NRBootLoader.class, BootloaderPanel.class));
+		//BowlerBoard Specific
+		//addPlugin(new DeviceSupportPlugginMap(BowlerBoardDevice.class, //none yet));
+		//AbstractKinematicsNR
+		//addPlugin(new DeviceSupportPluginMap(AbstractKinematicsNR.class, JogKinematicsDevice.class));
+		//addPlugin(new DeviceSupportPluginMap(AbstractKinematicsNR.class, AdvancedKinematicsController.class));
+		addPlugin(new DeviceSupportPluginMap(AbstractKinematicsNR.class, DhLab.class));
+		addPlugin(new DeviceSupportPluginMap(MobileBase.class, CreatureLab.class));
+		//NRPrinter
+		addPlugin(new DeviceSupportPluginMap(NRPrinter.class, PrinterConiguration.class));
+		//Bowler Cam
+		addPlugin(new DeviceSupportPluginMap(BowlerCamDevice.class, BowlerCamController.class));
+		//LinearPhysicsEngine
+		addPlugin(new DeviceSupportPluginMap(LinearPhysicsEngine.class, PidLab.class));
+
+	}
+	
+	public PluginManager(BowlerAbstractDevice dev){
 		this.dev = dev;
-		this.setBowlerStudioController(bowlerStudioController);
 		if(!dev.isAvailable())
 			throw new RuntimeException("Device is not reporting availible "+dev.getClass().getSimpleName());
-		
-		// add tabs to the support list based on thier class
-		// adding additional classes here will show up in the default 
-		// tabs list for objects of that type
-		if(DyIO.class.isInstance(dev)){
-			deviceSupport.add(DyIOConsole.class);
-			deviceSupport.add(AnamationSequencer.class);
-			deviceSupport.add(HexapodController.class);
+	}
+	
+	public static void addPlugin(DeviceSupportPluginMap newMap){
+
+		for(int i=0;i<deviceSupport.size();i++){
+			try{
+				if(		deviceSupport.get(i).getDevice() == newMap.getDevice() && 
+						deviceSupport.get(i).getPlugin() == newMap.getPlugin() ){
+					System.out.println("Removing duplicate plugin: "+deviceSupport.remove(i));
+				}
+			}catch(Exception e){
+				e.printStackTrace();
+			}
 		}
-		//any device that implements this interface
-		if(IPidControlNamespace.class.isInstance(dev)){
-			deviceSupport.add(PIDControl.class);
-		}
-		
-		if(AbstractImageProvider.class.isInstance(dev)){
-			deviceSupport.add(CameraTab.class);
-			deviceSupport.add(SalientTab.class);
-		}
-		
-		if(NRBootLoader.class.isInstance(dev)){
-			deviceSupport.add(BootloaderPanel.class);
-		}
-		
-		if(BowlerBoardDevice.class.isInstance(dev)){
-			
-		}
-		if(AbstractKinematicsNR.class.isInstance(dev)){
-			deviceSupport.add(KinematicsController.class);
-		}
-		if(NRPrinter.class.isInstance(dev)){
-			deviceSupport.add(PrinterConiguration.class);
-		}
-		if(BowlerCamDevice.class.isInstance(dev)){
-			deviceSupport.add(BowlerCamController.class);
-		}
-		
+		Log.debug("Adding Plugin "+newMap);
+		deviceSupport.add(newMap);
 	}
 	
 	
@@ -115,40 +121,42 @@ public class PluginManager {
 		return dev;
 	}
 
-	private AbstractBowlerStudioTab generateTab(Class<?> c) throws ClassNotFoundException, InstantiationException, IllegalAccessException{
+	private AbstractBowlerStudioTab generateTab(DeviceSupportPluginMap c) throws ClassNotFoundException, InstantiationException, IllegalAccessException{
 		for(AbstractBowlerStudioTab t: liveTabs){
-			if(c.isInstance(t)){
+			if(c.getPlugin().isInstance(t)){
 				// tab already exists, wake it up and return it
 				t.onTabReOpening();
 				return t;
 			}
 		}
-		AbstractBowlerStudioTab t =(AbstractBowlerStudioTab) Class.forName(
-					c.getName()
-				).cast(c.newInstance()// This is where the new tab allocation is called
-						)
-				;
+		AbstractBowlerStudioTab t=c.generateNewPlugin();
+
 		t.setDevice(dev);
 		liveTabs.add(t);
-		BowlerAbstractConnection con = dev.getConnection();
-		if(con!=null){
-			con.addConnectionEventListener(new IConnectionEventListener() {
-				@Override public void onDisconnect(BowlerAbstractConnection source) {
-					//if the device disconnects, close the tab
-					t.requestClose();
-				}
-				@Override public void onConnect(BowlerAbstractConnection source) {}
-			});
-		}
+
 		return t;
 	}
 
 	public void setTree(TreeItem<String> item) {
-		this.setItem(item);
+
+
+
+	
+	}
+
+	
+	public BowlerStudioController getBowlerStudioController() {
+		return BowlerStudioController.getBowlerStudio();
+	}
+	
+	public Node getBowlerBrowser(){
+
+		CheckBoxTreeItem<String> rpc = new CheckBoxTreeItem<String> ("Bowler RPC"); 
+		TreeView<String> treeView =new  TreeView<String>(rpc);
+		treeView.setCellFactory(CheckBoxTreeCell.forTreeView());
+		
 		if(dev.getConnection()!=null){
-			TreeItem<String> rpc = new TreeItem<String> ("Bowler RPC"); 
-			rpc.setExpanded(false);
-			item.getChildren().add(rpc);
+			rpc.setExpanded(true);
 			ArrayList<String> nameSpaceList = dev.getNamespaces();
 			for(String namespace:nameSpaceList){
 				CheckBoxTreeItem<String> ns = new CheckBoxTreeItem<String> (namespace); 
@@ -187,12 +195,15 @@ public class PluginManager {
 						break;
 					
 					}
+					RpcCommandPanel panel =new RpcCommandPanel(rpcEnc, dev,rc);
+
 					Platform.runLater(()->{
-						Stage dialog = new Stage();
-						dialog.initStyle(StageStyle.UTILITY);
-	
 						SwingNode sn = new SwingNode();
-				        sn.setContent(new RpcCommandPanel(rpcEnc, dev,rc));
+						Stage dialog = new Stage();
+						dialog.setHeight(panel.getHeight());
+						dialog.setWidth(panel.getWidth());
+						dialog.initStyle(StageStyle.UTILITY);
+					    sn.setContent(panel);
 						Scene scene = new Scene(new Group(sn));
 						dialog.setScene(scene);
 						dialog.setOnCloseRequest(event -> {
@@ -210,98 +221,79 @@ public class PluginManager {
 				}
 			}
 		}
-		TreeItem<String> plugins = new TreeItem<String> ("Plugins"); 
-		plugins.setExpanded(true);
-		//plugins.setSelected(true);
-		item.getChildren().add(plugins);
 		
-		for( Class<?> c:deviceSupport){
-			CheckBoxTreeItem<String> p = new CheckBoxTreeItem<String> (c.getSimpleName());
-			p.setSelected(false);
-			try {// These tabs are the select few to autoload when a device of theis type is connected
-				if( 	DyIOConsole.class ==c ||
-						BootloaderPanel.class ==c
-						){
-					System.out.println("Auto loading "+c.getSimpleName());
-					p.setSelected(true);
-					getBowlerStudioController().addTab(generateTab(c), true);
-				}else{
-					Log.warning("Not autoloading "+c);
-				}
-			} catch (IllegalArgumentException | IllegalAccessException
-					 | SecurityException
-					| ClassNotFoundException | InstantiationException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			p.selectedProperty().addListener(b ->{
-				
-				new Thread(){
-					public void run(){
-						try {
-							AbstractBowlerStudioTab t = generateTab(c);
-							if(p.isSelected()){
-								// allow the threads to finish before adding
-								//ThreadUtil.wait(50);
-								getBowlerStudioController().addTab(t, true);
-								t.setOnCloseRequest(arg0 -> {
-									System.out.println("Closing "+t.getText());
-									t.onTabClosing();
-									p.setSelected(false);
-								});
-								
-								System.out.println("Launching "+c.getSimpleName());
-				        	}else{
-				        		try{
-				        			System.out.println("Closing "+c.getSimpleName());
-				        			t.requestClose();
-				        		}catch (NullPointerException ex){
-				        			ex.printStackTrace();
-				        		};// tab is already closed
-				        	}
-						} catch (Exception e1) {
-							// TODO Auto-generated catch block
-							e1.printStackTrace();
+		return treeView;
+		
+	}
+
+	public ArrayList<TitledPane> getPlugins() {
+		ArrayList<TitledPane> plugins = new ArrayList<TitledPane>();
+		
+		VBox pluginLauncher = new VBox(20);
+		
+		for( DeviceSupportPluginMap c:deviceSupport){
+			if(c.getDevice().isInstance(dev)){
+				Button launcher = new Button("Launch "+c.getPlugin().getSimpleName());
+				try {// These tabs are the select few to autoload when a device of theis type is connected
+					if( 	DyIOControl.class ==c.getPlugin() ||
+							BootloaderPanel.class ==c.getPlugin()||
+							CreatureLab.class ==c.getPlugin()
+							){
+						if(getBowlerStudioController()!=null){
+							System.out.println("Auto loading "+c.getPlugin().getSimpleName());
+							Log.warning("Attempting Autoloading "+c);
+							launchTab( c,launcher);					
 						}
+					}else{
+						Log.warning("Not autoloading "+c);
 					}
-				}.start();
-
-	        	
-	        });
-				
-			plugins.getChildren().add(p);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					
+				}
+				launcher.setOnAction(b ->{
+					launchTab( c,launcher);
+		        });
+					
+				pluginLauncher.getChildren().add(launcher);
+			}
 		}
+		
+		plugins.add(new TitledPane("Device Info", new Text(dev.getClass().getSimpleName())));
+		if(dev.getConnection()!=null)
+			plugins.add(new TitledPane("Bowler Protocol",  getBowlerBrowser()));
+		plugins.add(new TitledPane("Plugins",  pluginLauncher));
+		return plugins;
+	}
 	
-	}
+	private void launchTab(DeviceSupportPluginMap c,Button launcher){
+		new Thread(){
+			public void run(){
+				setName("Launching "+c.getPlugin().getSimpleName());
+				try {
+					AbstractBowlerStudioTab t = generateTab(c);
 
-
-
-	public TreeItem<String> getTreeItem() {
-		return getCheckBoxItem();
-	}
-
-
-
-	public BowlerStudioController getBowlerStudioController() {
-		return bowlerStudioController;
-	}
-
-
-
-	public void setBowlerStudioController(BowlerStudioController bowlerStudioController) {
-		this.bowlerStudioController = bowlerStudioController;
-	}
-
-
-
-	public TreeItem<String> getCheckBoxItem() {
-		return item;
-	}
-
-
-
-	public void setItem(TreeItem<String> item) {
-		this.item = item;
+					// allow the threads to finish before adding
+					//ThreadUtil.wait(50);
+					getBowlerStudioController().addTab(t, true);
+					
+					t.setOnCloseRequest(arg0 -> {
+						System.out.println("PM is Closing "+t.getText());
+						t.onTabClosing();
+						Platform.runLater(()->launcher.setDisable(false));
+					});
+					Platform.runLater(()->{
+						launcher.setDisable(true);
+					});	
+					System.out.println("Launching "+c.getPlugin().getSimpleName());
+		        	
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		}.start();
 	}
 
 }

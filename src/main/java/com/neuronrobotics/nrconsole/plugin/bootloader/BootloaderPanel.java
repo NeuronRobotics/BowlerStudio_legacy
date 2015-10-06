@@ -96,7 +96,7 @@ public class BootloaderPanel extends AbstractBowlerStudioTab implements ActionLi
     	JFileChooser fc = new JFileChooser();
     	File dir2=null; 
     	try {
-    		dir2 = new File ("../../../dyio/FirmwarePublish/Dev/");
+    		dir2 = new File (System.getProperty("user.home")+"/git/dyio/FirmwarePublish/Dev/");
     		if(!dir2.exists()) {
     			dir2=new File ("../firmware/");
     			if(!dir2.exists()) {
@@ -251,17 +251,6 @@ public class BootloaderPanel extends AbstractBowlerStudioTab implements ActionLi
 			blApp = new NRBoot(pm);
 			loadButton.setEnabled(true);
 			selectFile();
-			pm.addConnectionEventListener(new IConnectionEventListener() {
-				
-				@Override
-				public void onDisconnect(BowlerAbstractConnection source) {
-					requestClose();
-				}
-				
-				@Override
-				public void onConnect(BowlerAbstractConnection source) {}
-			});
-
 	}
 
 
