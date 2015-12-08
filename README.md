@@ -145,7 +145,7 @@ Navigate to the [Gradle](http://www.gradle.org/) project (e.g., `path/to/BowlerS
     
     git submodule update
     
-    gradle assemble
+    ./gradlew assemble
     
     java -jar build/libs/BowlerStudio.jar
     
