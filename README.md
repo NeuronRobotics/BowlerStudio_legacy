@@ -1,6 +1,8 @@
 BowlerStudio
 ==========
 
+[![Join the chat at https://gitter.im/NeuronRobotics/BowlerStudio_legacy](https://badges.gitter.im/NeuronRobotics/BowlerStudio_legacy.svg)](https://gitter.im/NeuronRobotics/BowlerStudio_legacy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 #[Download Latest](https://github.com/NeuronRobotics/BowlerStudio/releases)
 
 #What is BowlerStudio?
